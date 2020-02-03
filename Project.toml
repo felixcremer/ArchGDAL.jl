@@ -16,7 +16,7 @@ DiskArrays = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"
 DataStreams = "0.4.2"
 GDAL = "1.0.2"
 GeoInterface = "0.4"
-julia = "1"
+julia = "1.2"
 
 [extras]
 BinaryProvider = "b99e7846-7c00-51b0-8f62-c81ae34c0232"
