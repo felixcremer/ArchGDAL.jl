@@ -1,6 +1,8 @@
 using Test
-import GeoInterface
-import ArchGDAL; const AG = ArchGDAL
+import GeoInterface, GeoFormatTypes, ArchGDAL 
+const AG = ArchGDAL
+const GFT = GeoFormatTypes
+const GI = GeoFormatTypes
 
 @testset "Reproject a Geometry" begin
     @testset "Method 1" begin
@@ -25,6 +27,23 @@ import ArchGDAL; const AG = ArchGDAL
                 @test zs ≈ [0.0, 0.0]
         end end end
     end
+
+    @testset "Use reproject" begin
+        @testset "reciprocal reprojection of wkt" begin
+            wktpoint = GFT.WellKnownText(GFT.Geom(), "POINT (1120351.57 741921.42)")
+            result = GFT.WellKnownText(GFT.Geom(), "POINT (47.3488013802885 -122.598135130878)")
+            @test AG.reproject(wktpoint, GFT.EPSG(2927), GFT.EPSG(4326)) == result
+            @test convert(AG.Geometry, AG.reproject(result, GFT.EPSG(4326), GFT.EPSG(2927))) |> 
+                GeoInterface.coordinates ≈ [1120351.57, 741921.42]
+        end
+        @testset "reproject vector, vector of vector, or tuple" begin
+            coord = [1120351.57, 741921.42]
+            @test AG.reproject(coord, GFT.EPSG(2927), GFT.EPSG(4326)) ≈ [47.348801, -122.598135]
+            @test AG.reproject([coord], GFT.EPSG(2927), GFT.EPSG(4326)) ≈ [[47.348801, -122.598135]]
+            coord = (1120351.57, 741921.42)
+            @test AG.reproject(coord, GFT.EPSG(2927), GFT.EPSG(4326)) ≈ [47.348801, -122.598135]
+        end
+    end
 end
 
 @testset "Get Projection" begin
@@ -41,12 +60,18 @@ end
         end
     end
     AG.importEPSG(26912) do spatialref
-        @test AG.toPROJ4(spatialref) == "+proj=utm +zone=12 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+        if VERSION >= v"1.3"  # GDAL.jl v1.1 which uses PROJ 6.3
+            proj4str = "+proj=utm +zone=12 +datum=NAD83 +units=m +no_defs"
+        else  # GDAL.jl v1.0 which uses PROJ 6.1
+            proj4str = "+proj=utm +zone=12 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+        end
+
+        @test AG.toPROJ4(spatialref) == proj4str
         @test AG.toWKT(spatialref)[1:6] == "PROJCS"
         AG.morphtoESRI!(spatialref)
-        @test AG.toPROJ4(spatialref) == "+proj=utm +zone=12 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+        @test AG.toPROJ4(spatialref) == proj4str
         AG.morphfromESRI!(spatialref)
-        @test AG.toPROJ4(spatialref) == "+proj=utm +zone=12 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+        @test AG.toPROJ4(spatialref) == proj4str
         AG.importEPSGA!(spatialref, 4326)
         @test AG.toPROJ4(spatialref) == "+proj=longlat +datum=WGS84 +no_defs"
     end
